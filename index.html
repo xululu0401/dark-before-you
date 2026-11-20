@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天黑比你先到</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #eef1ee; color: #1f2622; line-height: 1.6; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 20px 14px 40px; }
+  h1 { font-size: 25px; letter-spacing: 1px; }
+  .lead { color: #56625b; font-size: 14px; margin: 4px 0 14px; }
+  .card { background: #fff; border-radius: 8px; padding: 14px; border: 1px solid #d3dbd5; margin-bottom: 14px; min-width: 0; }
+  .card h2 { font-size: 15px; color: #56625b; font-weight: 600; margin-bottom: 8px; }
+  input, select { font: inherit; font-size: 14px; padding: 4px 6px; border: 1px solid #b4c0b8; border-radius: 5px; width: 100%; min-width: 0; background: #fbfdfb; font-variant-numeric: tabular-nums; }
+  .bad { border-color: #b23a2b !important; background: #fff0ec !important; }
+  label { font-size: 12px; color: #66736b; display: block; }
+  button { font: inherit; font-size: 13px; padding: 6px 11px; border-radius: 5px; border: 1px solid #2f5d47; background: #2f5d47; color: #fff; cursor: pointer; }
+  button.ghost { background: #fff; color: #2f5d47; }
+  button.x { padding: 2px 8px; background: #fff; color: #8a2a1b; border-color: #d9b3ab; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .row + .row { margin-top: 10px; }
+  @media (max-width: 680px) { .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .presets, .dl { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .err { display: none; background: #fff0ec; border: 1px solid #e0b2a7; color: #8a2a1b; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; overflow-wrap: anywhere; }
+  /* 路段表：每行一个路标 */
+  .segs { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .segs th { font-size: 12px; color: #66736b; font-weight: 600; text-align: left; padding: 2px 4px; }
+  .segs td { padding: 3px 4px; vertical-align: middle; }
+  .segs td.no { color: #8a958e; width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+  .segs td.nm { width: 40%; }
+  @media (max-width: 560px) {
+    .segs thead { display: none; }
+    .segs tr { display: grid; grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 4px; padding: 6px 0; border-top: 1px solid #eef1ee; }
+    .segs td { padding: 0; } .segs td.nm { grid-column: 2 / 6; width: auto; } .segs td.no { grid-row: 1 / 3; width: auto; }
+    .segs td[data-l]::before { content: attr(data-l); display: block; font-size: 11px; color: #8a958e; }
+  }
+  #summary { font-size: 21px; font-weight: 700; overflow-wrap: anywhere; }
+  #summary.no { color: #9a3324; } #summary.yes { color: #2f5d47; }
+  .nums { display: flex; flex-wrap: wrap; gap: 6px 26px; margin: 10px 0 4px; }
+  .nums div { min-width: 0; } .nums small { display: block; font-size: 12px; color: #77837b; }
+  .nums b { font-size: 24px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .neg { color: #b23a2b; } .pos { color: #2f6b3a; }
+  #facts { margin: 8px 0 0 18px; font-size: 14px; } #facts li { margin: 3px 0; overflow-wrap: anywhere; }
+  /* 路线剖面 */
+  #profile { width: 100%; height: auto; display: block; }
+  .key { font-size: 12px; color: #66736b; display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+  .key i { display: inline-block; width: 14px; height: 4px; vertical-align: 3px; margin-right: 4px; }
+  /* 关门时间牌 */
+  .gates { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+  .gate { border: 1px solid #cfd8d2; border-left: 5px solid #3f8a5f; border-radius: 6px; padding: 8px 10px; min-width: 0; background: #fbfdfb; }
+  .gate.late { border-left-color: #b23a2b; background: #fff6f3; }
+  .gate .gn { font-weight: 700; overflow-wrap: anywhere; }
+  .gate .gk { font-size: 12px; color: #77837b; }
+  .gate .gt { font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .gate .gt b { font-size: 18px; }
+  .gate .gs { font-size: 12px; margin-top: 2px; }
+  .sugs { list-style: none; }
+  .sugs li { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; padding: 8px 0; border-top: 1px solid #eef1ee; font-size: 14px; }
+  .sugs li:first-child { border-top: none; } .sugs li span { overflow-wrap: anywhere; min-width: 0; } .sugs li button { flex: none; }
+  .rules { font-size: 13px; } .rules p { margin: 4px 0; }
+  .note { font-size: 12px; color: #77837b; margin-top: 8px; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>天黑比你先到</h1>
+  <p class="lead">一条往返的山路，几点出发、走多快，能不能在天黑前回到起点？把路线按路标分成几段，填距离和爬升，它会给每个路标算一个「关门时间」：过了这个点还没走到，就该掉头了。走到半路也能填实际到达时间，按你今天的真实速度重算。</p>
+
+  <div class="card">
+    <h2>今天的安排</h2>
+    <div class="row">
+      <div><label for="start">出发时间</label><input id="start" inputmode="numeric" placeholder="08:00"></div>
+      <div><label for="sunset">日落时间（查天气 App）</label><input id="sunset" inputmode="numeric" placeholder="17:20"></div>
+      <div><label for="margin">日落前多少分钟回到起点</label><input id="margin" inputmode="numeric"></div>
+      <div><label for="rest">每走 1 小时歇几分钟</label><input id="rest" inputmode="numeric"></div>
+    </div>
+    <div class="row">
+      <div><label for="flat">平路速度（km/h）</label><input id="flat" inputmode="decimal"></div>
+      <div><label for="climb">每小时能爬升（米）</label><input id="climb" inputmode="decimal"></div>
+      <div><label for="down">每小时能下降（米）</label><input id="down" inputmode="decimal"></div>
+      <div><label for="slow">回程比去程慢（%）</label><input id="slow" inputmode="decimal"></div>
+    </div>
+    <p class="note">一段路的用时 = 距离 ÷ 平路速度 + 上升 ÷ 每小时爬升 + 下降 ÷ 每小时下降。默认速度是常见的估法（平路 4 km/h、每小时爬 400 米），不是你的真实体能；走过一次之后按自己的记录改。默认路线是虚构的。</p>
+    <div class="presets" id="presets"></div>
+  </div>
+
+  <div class="card">
+    <h2>路线（从起点往上，每行走到一个路标）</h2>
+    <table class="segs" id="segs"></table>
+    <div class="presets"><button class="ghost" id="addSeg">加一段</button></div>
+    <p class="note">回程按同一条路倒着走：去程的上升就是回程的下降。最后一行就是你打算到的地方（顶峰、湖、营地都行）。</p>
+  </div>
+
+  <div class="card">
+    <h2>已经在路上了？按实际速度重算</h2>
+    <div class="row">
+      <div><label for="calibCp">刚走到的路标</label><select id="calibCp"></select></div>
+      <div><label for="calibAt">实际到达时间</label><input id="calibAt" inputmode="numeric" placeholder="09:20"></div>
+    </div>
+    <p class="note">用「实际用时 ÷ 计划用时」得到一个倍数，后面所有路段按同一个倍数放大或缩小。选「还没出发」就不校准。</p>
+  </div>
+
+  <div class="err" id="error"></div>
+
+  <div id="out" style="display:none;">
+    <div class="card">
+      <div id="summary"></div>
+      <div class="nums" id="nums"></div>
+      <ul id="facts"></ul>
+    </div>
+
+    <div class="card">
+      <h2>路线剖面：时间画在路上</h2>
+      <svg id="profile" viewBox="0 0 900 300" role="img" aria-label="路线剖面图"></svg>
+      <div class="key"><span><i style="background:#3f8a5f"></i>来得及的路</span><span><i style="background:#c0503f"></i>按时回不来的路</span><span><i style="background:#1f2622;height:2px"></i>最晚掉头点</span></div>
+      <p class="note">横轴是离起点的距离，纵轴是累计爬升出来的相对高度（起点记 0 米），不是真实海拔。</p>
+    </div>
+
+    <div class="card">
+      <h2>每个路标的关门时间</h2>
+      <div class="gates" id="gates"></div>
+      <p class="note">关门时间 = 最晚回到起点 − 从这里走回去要的时间。到达时间往晚了取整，关门时间往早了取整，都偏保守。</p>
+    </div>
+
+    <div class="card" id="sugCard">
+      <h2>换个条件看看</h2>
+      <ul class="sugs" id="sugs"></ul>
+      <p class="note">每条只改一处，按改完之后重算的结果写；点「照这个改」会填回上面，可以再改回来。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>导出与保存</h2>
+    <div class="dl">
+      <button id="dlPNG">结果卡 PNG</button>
+      <button class="ghost" id="dlCSV">CSV</button>
+      <button class="ghost" id="dlMD">Markdown</button>
+      <button class="ghost" id="dlJSON">JSON 备份</button>
+      <button class="ghost" id="reset">恢复默认例子</button>
+    </div>
+    <p class="note">填的内容自动保存在这台设备的浏览器里，刷新后还在；不上传、不联网。</p>
+  </div>
+
+  <div class="card rules">
+    <h2>怎么算的、算不了什么</h2>
+    <p><b>每段用时</b> = 距离 ÷ 平路速度 + 上升米数 ÷ 每小时爬升 + 下降米数 ÷ 每小时下降，再乘 (1 + 每小时歇的分钟 ÷ 60)。这是徒步圈常用的「距离 + 爬升」估法的一种写法，参数要按自己改。</p>
+    <p><b>回程</b>：同一条路倒着走，上升和下降对调，再乘 (1 + 回程变慢 %)。</p>
+    <p><b>关门时间</b>：最晚回到起点 = 日落 − 你留的分钟；某个路标的关门时间 = 最晚回到起点 − 从这个路标走回起点的时间。</p>
+    <p><b>最晚掉头点</b>：在一段路里按匀速算，找到「从起点走到这里 + 从这里走回起点」正好等于可用时间的那个位置。</p>
+    <p><b>按实际速度重算</b>：倍数 = (实际到达 − 出发) ÷ 计划用时，所有路段乘这个倍数。</p>
+    <p>算不了：天气变化、迷路、受伤、海拔高了体能下降、路况（碎石、积雪、溯溪）、真实日落时刻（请自己查）。山谷和密林里天黑得比日落早。这是出发前和路上的估算，不是安全保证；拿不准就早点掉头。</p>
+  </div>
+</div>
+
+  <script>
+/* 天黑比你先到 · 计算核心（无 DOM，可在 node 里 require）
+ *
+ * 问题：一条往返的登山/徒步路线，几点出发、走得多快，能不能在天黑前回到起点？
+ *       如果到不了顶，最晚几点、走到哪里就必须掉头？每个路标的「关门时间」是几点？
+ *
+ * 模型（全部写在页面「怎么算的」里）：
+ *   路线分成若干段，每段：距离 km、上升 up（米）、下降 down（米）。
+ *   一段的行走时间（小时）= km ÷ 平路速度 + up ÷ 每小时爬升 + down ÷ 每小时下降。
+ *   休息：每走 1 小时停 rest 分钟 → 用时 × (1 + rest/60)。
+ *   回程：同一条路倒着走（上升和下降对调），再乘 (1 + 回程变慢%)，因为下午人累了。
+ *   实际进度校准（可选）：填「走到第 k 个路标的实际时间」，实际用时 ÷ 计划用时 = 倍数，所有时间按这个倍数放大或缩小。
+ *   最晚回到起点 = 日落 − 留出的分钟。
+ *   每个路标的关门时间 = 最晚回到起点 − 从这里走回起点的时间。到达时间晚于关门时间，就必须在这之前掉头。
+ *   最晚掉头点：一段之内假设匀速，出发 + 去程(x) + 回程(x) = 最晚回到起点，x 在段内是线性方程，直接解。
+ *   显示取整：到达时间向上取整到分钟，关门/掉头时间向下取整到分钟（都往保守的方向）。
+ *   不做：天气、迷路、受伤、海拔对体能的影响、实时日落计算、真实路线数据。
+ */
+(function (root) {
+  'use strict';
+  const MAXSEG = 12;
+  const DAY = 1440;
+
+  function bad(field, message) { const e = new Error(message); e.field = field; throw e; }
+  function clean(s) { return String(s == null ? '' : s).replace(/[−–—]/g, '-').replace(/＋/g, '+').replace(/％/g, '%').replace(/[,，\s]/g, ''); }
+  function num(s) { const t = clean(s); return /^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN; }
+  function round(x, d) { const p = Math.pow(10, d); return Math.round(Number((x * p).toPrecision(15))) / p; }
+  function fmt(x, d) {
+    const r = round(x, d);
+    let s = Math.abs(r).toFixed(d);
+    if (d > 0) s = s.replace(/\.?0+$/, '');
+    const parts = s.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (r < 0 ? '-' : '') + parts.join('.');
+  }
+  /* 浮点误差先收一下再取整，避免 600.0000001 被向上取成 601 */
+  const ceilM = (m) => Math.ceil(round(m, 6));
+  const floorM = (m) => Math.floor(round(m, 6));
+
+  /* "7:30" / "07：30" / "730" → 分钟数 */
+  function parseTime(s) {
+    const t = String(s == null ? '' : s).replace(/[：.]/g, ':').replace(/\s/g, '');
+    let m = /^(\d{1,2}):(\d{2})$/.exec(t);
+    if (!m) m = /^(\d{1,2})(\d{2})$/.exec(t);
+    if (!m) return NaN;
+    const h = Number(m[1]), mi = Number(m[2]);
+    if (h > 23 || mi > 59) return NaN;
+    return h * 60 + mi;
+  }
+  /* 分钟（整数）→ "07:30"，过了午夜写「次日」 */
+  function clock(m) {
+    const d = Math.floor(m / DAY), r = ((m % DAY) + DAY) % DAY;
+    const z = (n) => String(n).padStart(2, '0');
+    return (d > 0 ? (d === 1 ? '次日 ' : d + ' 天后 ') : d < 0 ? '前一天 ' : '') + z(Math.floor(r / 60)) + ':' + z(r % 60);
+  }
+  /* 分钟（整数）→ "2 小时 5 分钟" */
+  function dur(m) {
+    m = Math.round(Math.abs(m));
+    const h = Math.floor(m / 60), mi = m % 60;
+    if (h >= 24) return Math.floor(h / 24) + ' 天' + (h % 24 ? ' ' + (h % 24) + ' 小时' : '') + (mi ? ' ' + mi + ' 分钟' : '');
+    if (!h) return mi + ' 分钟';
+    return h + ' 小时' + (mi ? ' ' + mi + ' 分钟' : '');
+  }
+
+  function rangeNum(s, field, name, lo, hi, unit) {
+    const x = num(s);
+    if (!Number.isFinite(x)) bad(field, name + '要填一个数' + (unit ? '（' + unit + '）' : ''));
+    if (x < lo || x > hi) bad(field, name + '要在 ' + lo + ' 到 ' + hi + (unit ? ' ' + unit : '') + ' 之间');
+    return x;
+  }
+
+  function parse(s) {
+    s = s || {};
+    const start = parseTime(s.start);
+    if (!Number.isFinite(start)) bad('start', '出发时间要写成 07:30 这样的 24 小时制');
+    const sunset = parseTime(s.sunset);
+    if (!Number.isFinite(sunset)) bad('sunset', '日落时间要写成 17:20 这样的 24 小时制');
+    const margin = rangeNum(s.margin, 'margin', '提前回到起点的分钟数', 0, 180, '分钟');
+    if (Math.round(margin) !== margin) bad('margin', '提前回到起点的分钟数要填整数');
+    const deadline = sunset - margin;
+    if (sunset <= start) bad('sunset', '日落要比出发晚（这里只算当天往返）');
+    if (deadline <= start) bad('margin', '日落前 ' + margin + ' 分钟是 ' + clock(deadline) + '，已经不晚于出发时间，没时间走了');
+    const flat = rangeNum(s.flat, 'flat', '平路速度', 0.5, 10, 'km/h');
+    const climb = rangeNum(s.climb, 'climb', '每小时爬升', 50, 2000, '米');
+    const down = rangeNum(s.down, 'down', '每小时下降', 100, 3000, '米');
+    const rest = rangeNum(s.rest, 'rest', '每小时休息', 0, 60, '分钟');
+    const slow = rangeNum(s.slow, 'slow', '回程变慢', 0, 100, '%');
+    const segs = Array.isArray(s.segs) ? s.segs : [];
+    if (!segs.length) bad('segs', '至少要有一段路');
+    if (segs.length > MAXSEG) bad('segs', '最多 ' + MAXSEG + ' 段');
+    const S = segs.map((g, i) => {
+      const f = 'seg' + i;
+      const name = String(g && g.name != null ? g.name : '').trim().slice(0, 40) || ('第 ' + (i + 1) + ' 个路标');
+      const km = num(g && g.km), up = num(g && g.up), dn = num(g && g.down);
+      if (!(km > 0) || km > 100) bad(f + 'km', '第 ' + (i + 1) + ' 段距离要在 0 到 100 公里之间，且大于 0');
+      if (!Number.isFinite(up) || up > 5000) bad(f + 'up', '第 ' + (i + 1) + ' 段上升要填 0 到 5000 米');
+      if (!Number.isFinite(dn) || dn > 5000) bad(f + 'down', '第 ' + (i + 1) + ' 段下降要填 0 到 5000 米');
+      return { name, km, up, down: dn };
+    });
+    const ck = s.calibCp == null || s.calibCp === '' ? 0 : Number(s.calibCp);
+    if (!(Number.isInteger(ck) && ck >= 0 && ck <= S.length)) bad('calibCp', '校准的路标不在路线里');
+    let calibAt = null;
+    if (ck > 0) {
+      calibAt = parseTime(s.calibAt);
+      if (!Number.isFinite(calibAt)) bad('calibAt', '实际到达时间要写成 09:40 这样的 24 小时制');
+      if (calibAt <= start) bad('calibAt', '实际到达时间要比出发晚');
+    }
+    return { start, sunset, margin, deadline, flat, climb, down, rest, slow, segs: S, calibCp: ck, calibAt };
+  }
+
+  /* 一段路的纯行走时间（分钟，不含休息） */
+  const walk = (km, up, dn, P) => (km / P.flat + up / P.climb + dn / P.down) * 60;
+
+  function calculate(s) {
+    const P = parse(s);
+    const n = P.segs.length;
+    const restF = 1 + P.rest / 60, slowF = 1 + P.slow / 100;
+    const o0 = P.segs.map((g) => walk(g.km, g.up, g.down, P) * restF);
+    const b0 = P.segs.map((g) => walk(g.km, g.down, g.up, P) * restF * slowF); /* 倒着走：上升下降对调 */
+    let factor = 1;
+    if (P.calibCp > 0) {
+      const plan = o0.slice(0, P.calibCp).reduce((a, x) => a + x, 0);
+      factor = (P.calibAt - P.start) / plan;
+      if (factor < 0.3 || factor > 3) bad('calibAt', '实际用时是计划的 ' + fmt(factor, 2) + ' 倍，差得太多，先看看是不是选错了路标或时间填错了');
+    }
+    const o = o0.map((x) => x * factor), b = b0.map((x) => x * factor);
+    if (o.reduce((a, x) => a + x, 0) > DAY) bad('segs', '按这个速度单程就要 ' + dur(o.reduce((a, x) => a + x, 0)) + '，超过 24 小时；这里只算当天往返，先检查速度和距离');
+    const O = [0], B = [0], K = [0];
+    for (let i = 0; i < n; i++) { O.push(O[i] + o[i]); B.push(B[i] + b[i]); K.push(K[i] + P.segs[i].km); }
+    const D = P.deadline, T0 = P.start;
+    const cps = [];
+    for (let i = 1; i <= n; i++) {
+      const arrive = ceilM(T0 + O[i]), cutoff = floorM(D - B[i]);
+      cps.push({ i, name: P.segs[i - 1].name, km: K[i], arriveRaw: T0 + O[i], cutoffRaw: D - B[i], arrive, cutoff, slack: cutoff - arrive, ok: T0 + O[i] <= D - B[i] + 1e-9 });
+    }
+    const summitAt = T0 + O[n], returnRaw = T0 + O[n] + B[n];
+    const feasible = returnRaw <= D + 1e-9;
+    let turn = null;
+    if (!feasible) {
+      let i = 1;
+      while (T0 + O[i] + B[i] <= D + 1e-9) i++;
+      const f = (D - T0 - O[i - 1] - B[i - 1]) / (o[i - 1] + b[i - 1]);
+      const atRaw = T0 + O[i - 1] + f * o[i - 1];
+      turn = { seg: i, f, km: K[i - 1] + f * P.segs[i - 1].km, atRaw, at: floorM(atRaw),
+        from: i === 1 ? '起点' : P.segs[i - 2].name, to: P.segs[i - 1].name, lastOk: i - 1 };
+    }
+    const k = {
+      outMin: O[n], backMin: B[n], totalMin: O[n] + B[n], km: K[n] * 2,
+      up: P.segs.reduce((a, g) => a + g.up, 0), down: P.segs.reduce((a, g) => a + g.down, 0),
+      summitAt: ceilM(summitAt), leaveBy: floorM(D - B[n]), returnAt: ceilM(returnRaw), returnRaw,
+      latestStart: floorM(D - O[n] - B[n]), slack: floorM(D) - ceilM(returnRaw)
+    };
+    /* 已经在路上（校准过）且当前路标已经过了关门时间：只能现在就往回走 */
+    let now = null;
+    if (P.calibCp > 0) {
+      const ck = P.calibCp, backRaw = P.calibAt + B[ck];
+      now = { cp: ck, name: P.segs[ck - 1].name, at: P.calibAt, backMin: B[ck], returnAt: ceilM(backRaw), returnRaw: backRaw,
+        late: !cps[ck - 1].ok, cutoff: cps[ck - 1].cutoff, slack: floorM(D) - ceilM(backRaw) };
+    }
+    const r = { P, o, b, O, B, K, cps, feasible, turn, factor, k, now };
+    r.summary = summary(r);
+    r.facts = facts(r);
+    return r;
+  }
+
+  /* 关门时间早于出发：写「出发前就关门」，不写「前一天」 */
+  function cutText(c, P) { return c.cutoff < P.start ? '出发前就关门' : clock(c.cutoff); }
+  const endName = (P) => '「' + P.segs[P.segs.length - 1].name + '」';
+  function summary(r) {
+    const k = r.k, P = r.P, E = endName(P);
+    if (r.feasible) return '来得及：' + clock(k.summitAt) + ' 到' + E + '，最晚 ' + clock(k.leaveBy) + ' 往回走，照计划 ' + clock(k.returnAt) + ' 回到起点，比你定的 ' + clock(P.deadline) + ' 早 ' + dur(k.slack);
+    const t = r.turn;
+    if (r.now && r.now.late) return '已经过了掉头点：你在「' + r.now.name + '」，它 ' + clock(r.now.cutoff) + ' 就关门了；现在立刻往回走，预计 ' + clock(r.now.returnAt) + ' 回到起点，' + (r.now.slack >= 0 ? '比 ' + clock(P.deadline) + ' 早 ' + dur(r.now.slack) : '比 ' + clock(P.deadline) + ' 还晚 ' + dur(-r.now.slack) + '，备好头灯');
+    return '到不了' + E + '：最晚 ' + clock(t.at) + ' 就得掉头，那时大约在「' + t.from + '」往「' + t.to + '」的路上、离起点 ' + fmt(t.km, 1) + ' 公里；硬走到' + E + '要 ' + clock(k.returnAt) + ' 才回到起点，比 ' + clock(P.deadline) + ' 晚 ' + dur(-k.slack);
+  }
+  function facts(r) {
+    const k = r.k, P = r.P, n = P.segs.length;
+    const F = [];
+    F.push('往返 ' + fmt(k.km, 1) + ' 公里，单程上升 ' + fmt(k.up, 0) + ' 米：去程要 ' + dur(Math.round(k.outMin)) + '，回程要 ' + dur(Math.round(k.backMin)) + '（含休息' + (P.slow ? '，回程按慢 ' + fmt(P.slow, 0) + '% 算' : '') + '）。');
+    if (!r.now) F.push('日落 ' + clock(P.sunset) + '，你要在日落前 ' + P.margin + ' 分钟、也就是 ' + clock(P.deadline) + ' 前回到起点；' + (k.latestStart < 0 ? '要走完全程得前一天就出发，这条路线今天当天往返不了' : '要准时回来，最晚 ' + clock(k.latestStart) + ' 出发' + (k.latestStart < P.start ? '，比你的出发时间早 ' + dur(P.start - k.latestStart) : '，你比这早了 ' + dur(P.start - k.latestStart))) + '。');
+    else if (r.feasible) F.push('日落 ' + clock(P.sunset) + '，要在 ' + clock(P.deadline) + ' 前回到起点；按你今天的速度走完全程还富余 ' + dur(k.slack) + '。');
+    else F.push('日落 ' + clock(P.sunset) + '，要在 ' + clock(P.deadline) + ' 前回到起点；从「' + r.now.name + '」走回去按你今天的速度要 ' + dur(Math.round(r.now.backMin)) + '，现在掉头 ' + clock(r.now.returnAt) + ' 到起点。');
+    if (r.now) F.push('按你实际走到「' + P.segs[P.calibCp - 1].name + '」的时间 ' + clock(P.calibAt) + '，你比计划' + (r.factor > 1 ? '慢' : '快') + '：所有时间都乘了 ' + fmt(r.factor, 2) + '。');
+    const late = r.cps.filter((c) => !c.ok);
+    if (late.length && late.length < n) F.push('能按时往返的最远路标是「' + r.cps[r.turn.lastOk - 1].name + '」（关门 ' + clock(r.cps[r.turn.lastOk - 1].cutoff) + '）；「' + late[0].name + '」预计 ' + clock(late[0].arrive) + ' 才到，但它' + (late[0].cutoff < P.start ? '在你出发前就关门了。' : ' ' + clock(late[0].cutoff) + ' 就关门了。'));
+    else if (late.length === n) F.push('连第一个路标「' + r.cps[0].name + '」都赶不上' + (r.cps[0].cutoff < P.start ? '（它在你出发前就关门了）' : '关门时间 ' + clock(r.cps[0].cutoff)) + '，这条路今天只能走一小截。');
+    else F.push('每个路标都赶得上关门时间，最紧的是「' + r.cps.reduce((a, c) => (c.slack < a.slack ? c : a)).name + '」，只富余 ' + dur(Math.min.apply(null, r.cps.map((c) => c.slack))) + '。');
+    return F;
+  }
+
+  /* 只改一处的建议；每条都把改完的输入重算一遍再写结果 */
+  function suggestions(s, r) {
+    const out = [];
+    const tryApply = (apply) => { try { return calculate(Object.assign({}, s, apply)); } catch (e) { return null; } };
+    const hm = (m) => { const z = (x) => String(x).padStart(2, '0'); return z(Math.floor(m / 60)) + ':' + z(m % 60); };
+    const P = r.P;
+    if (r.now && r.now.late) return out; /* 已经过了掉头点：唯一的建议就是现在往回走，写在结论里，不再给别的 */
+    if (!r.feasible) {
+      /* 1. 提前出发：要早 (回到起点 − 最晚回到) 分钟，向下取到 5 分钟 */
+      const need = r.k.returnRaw - P.deadline;
+      const ns = Math.floor((P.start - need) / 5) * 5;
+      if (ns >= 0 && !P.calibCp) {
+        const x = tryApply({ start: hm(ns) });
+        if (x && x.feasible) out.push({ kind: 'start', apply: { start: hm(ns) }, text: '出发提前到 ' + hm(ns) + '（早 ' + dur(P.start - ns) + '）：' + clock(x.k.summitAt) + ' 到' + endName(P) + '，' + clock(x.k.returnAt) + ' 回到起点，富余 ' + dur(x.k.slack) + '。' });
+      }
+      /* 2. 换个近一点的终点：走到最远的能按时往返的路标就回 */
+      if (r.turn.lastOk >= 1) {
+        const segs = s.segs.slice(0, r.turn.lastOk);
+        const apply = { segs, calibCp: Math.min(Number(s.calibCp) || 0, r.turn.lastOk) || 0 };
+        const x = tryApply(apply);
+        if (x && x.feasible) out.push({ kind: 'segs', apply, text: '这次只走到「' + segs[segs.length - 1].name + '」就回：' + clock(x.k.summitAt) + ' 到那里，' + clock(x.k.returnAt) + ' 回到起点，富余 ' + dur(x.k.slack) + '。' });
+      }
+      /* 3. 少歇：总用时 = 纯走 × (1 + 休息/60)，解出休息上限，向下取整 */
+      const pure = r.k.totalMin / (1 + P.rest / 60);
+      const rr = Math.floor(round(60 * ((P.deadline - P.start) / pure - 1), 6));
+      if (rr >= 0 && rr < P.rest) {
+        const x = tryApply({ rest: String(rr) });
+        if (x && x.feasible) out.push({ kind: 'rest', apply: { rest: String(rr) }, text: '每小时只歇 ' + rr + ' 分钟（现在 ' + fmt(P.rest, 0) + ' 分钟）：' + clock(x.k.returnAt) + ' 回到起点，富余 ' + dur(x.k.slack) + '。歇太少人会更累，回程可能更慢。' });
+      }
+    } else {
+      /* 来得及：给两种压力测试 */
+      const ns = Math.min(P.slow + 20, 100);
+      if (ns > P.slow) {
+        const x = tryApply({ slow: String(ns) });
+        if (x) out.push({ kind: 'slow', apply: { slow: String(ns) }, text: '回程再慢一些（按慢 ' + ns + '% 算）：' + (x.feasible ? '仍来得及，' + clock(x.k.returnAt) + ' 回到起点，富余 ' + dur(x.k.slack) + '。' : '就到不了' + endName(P) + '了，最晚 ' + clock(x.turn.at) + ' 掉头。') });
+      }
+      const nm = P.margin + 30;
+      if (nm <= 180) {
+        const x = tryApply({ margin: String(nm) });
+        if (x) out.push({ kind: 'margin', apply: { margin: String(nm) }, text: '想在日落前 ' + nm + ' 分钟就回到起点（山谷里天黑得早）：' + (x.feasible ? '仍来得及，富余 ' + dur(x.k.slack) + '。' : '到不了' + endName(P) + '，最晚 ' + clock(x.turn.at) + ' 掉头。') });
+      } else if (!P.margin) { /* 不会到这里，margin+30 > 180 时 margin ≥ 151 */ }
+    }
+    return out;
+  }
+
+  function csvCell(v) { const t = String(v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
+  function toCSV(r, when) {
+    const P = r.P, L = [];
+    L.push(['天黑比你先到', when].map(csvCell).join(','));
+    L.push(['出发', clock(P.start)].join(','));
+    L.push(['日落', clock(P.sunset)].join(','));
+    L.push(['最晚回到起点', clock(P.deadline)].join(','));
+    L.push(['结论', r.summary].map(csvCell).join(','));
+    L.push('');
+    L.push('路标,离起点(km),段距离(km),段上升(m),段下降(m),去程用时(分),预计到达,关门时间,富余(分),能否按时往返');
+    r.cps.forEach((c, j) => {
+      const g = P.segs[j];
+      L.push([c.name, fmt(c.km, 2), fmt(g.km, 2), fmt(g.up, 0), fmt(g.down, 0), Math.round(r.o[j]), clock(c.arrive), cutText(c, P), c.slack, c.ok ? '能' : '不能'].map(csvCell).join(','));
+    });
+    L.push('');
+    r.facts.forEach((f) => L.push(csvCell(f)));
+    return L.join('\n') + '\n';
+  }
+  function toMD(r, when, sg) {
+    const P = r.P, L = [];
+    L.push('# 天黑比你先到', '', '> ' + when + ' · 出发 ' + clock(P.start) + ' · 日落 ' + clock(P.sunset) + ' · 最晚回到起点 ' + clock(P.deadline), '');
+    L.push('**' + r.summary + '**', '');
+    r.facts.forEach((f) => L.push('- ' + f));
+    L.push('', '| 路标 | 离起点 | 预计到达 | 关门时间 | 富余 |', '|---|---:|---:|---:|---:|');
+    r.cps.forEach((c) => L.push('| ' + c.name.replace(/\|/g, '\\|') + ' | ' + fmt(c.km, 1) + ' km | ' + clock(c.arrive) + ' | ' + cutText(c, P) + ' | ' + (c.slack < 0 ? '晚 ' + dur(-c.slack) : dur(c.slack)) + ' |'));
+    if (sg && sg.length) { L.push('', '## 换个条件看看'); sg.forEach((x) => L.push('- ' + x.text)); }
+    L.push('', '速度：平路 ' + fmt(P.flat, 2) + ' km/h，每小时爬升 ' + fmt(P.climb, 0) + ' 米、下降 ' + fmt(P.down, 0) + ' 米，每小时歇 ' + fmt(P.rest, 0) + ' 分钟，回程慢 ' + fmt(P.slow, 0) + '%。');
+    L.push('', '估算只按距离、爬升和你填的速度算，不含天气、迷路、受伤；山里天黑得比日落早，头灯要带。');
+    return L.join('\n') + '\n';
+  }
+
+  const api = { cutText, parse, calculate, suggestions, toCSV, toMD, parseTime, clock, dur, fmt, round, walk, MAXSEG };
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.AppCore = api;
+})(typeof window !== 'undefined' ? window : this);
+
+  </script>
+  <script>
+/* 天黑比你先到 · 界面层 */
+(function () {
+  'use strict';
+  const C = window.AppCore;
+  const KEY = 'dark-before-you:v1';
+  const ROUTE = [
+    { name: '林道口', km: '2.5', up: '120', down: '0' },
+    { name: '半山亭', km: '2', up: '380', down: '20' },
+    { name: '垭口', km: '2', up: '320', down: '40' },
+    { name: '顶峰', km: '1.5', up: '200', down: '0' }
+  ];
+  const DEFAULT = { start: '08:00', sunset: '17:20', margin: '30', rest: '10', flat: '4', climb: '400', down: '600', slow: '15', segs: ROUTE, calibCp: '0', calibAt: '' };
+  const PRESETS = [
+    ['默认：冬天 8 点出发', DEFAULT],
+    ['早一个钟头出发', Object.assign({}, DEFAULT, { start: '07:00' })],
+    ['夏天：日落 19:30', Object.assign({}, DEFAULT, { sunset: '19:30' })],
+    ['走到半山亭已经 10:30', Object.assign({}, DEFAULT, { start: '07:00', calibCp: '2', calibAt: '10:30' })],
+    ['平路短途：湖边往返', Object.assign({}, DEFAULT, { start: '14:00', segs: [{ name: '桥头', km: '3', up: '20', down: '10' }, { name: '湖边观景台', km: '2.5', up: '60', down: '15' }] })]
+  ];
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const copy = (o) => JSON.parse(JSON.stringify(o));
+  const F = ['start', 'sunset', 'margin', 'rest', 'flat', 'climb', 'down', 'slow', 'calibAt'];
+  let state = copy(DEFAULT);
+  let last = null;
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 隐私模式忽略 */ } }
+  function load() {
+    try {
+      const o = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+      const s = copy(DEFAULT);
+      F.concat(['calibCp']).forEach((k) => { if (o[k] != null) s[k] = String(o[k]).slice(0, 40); });
+      if (Array.isArray(o.segs) && o.segs.length) {
+        s.segs = o.segs.slice(0, C.MAXSEG).map((g) => ({ name: String((g && g.name) || '').slice(0, 40), km: String((g && g.km) || ''), up: String((g && g.up) || ''), down: String((g && g.down) || '') }));
+      }
+      return s;
+    } catch (e) { return null; }
+  }
+
+  function drawSegs() {
+    let h = '<thead><tr><th></th><th>路标名</th><th>这段距离 km</th><th>上升 米</th><th>下降 米</th><th></th></tr></thead><tbody>';
+    state.segs.forEach((g, i) => {
+      h += '<tr><td class="no">' + (i + 1) + '</td>' +
+        '<td class="nm"><input id="seg' + i + 'name" data-i="' + i + '" data-k="name" maxlength="40" aria-label="第 ' + (i + 1) + ' 个路标名"></td>' +
+        '<td data-l="距离 km"><input id="seg' + i + 'km" data-i="' + i + '" data-k="km" inputmode="decimal" aria-label="第 ' + (i + 1) + ' 段距离"></td>' +
+        '<td data-l="上升 米"><input id="seg' + i + 'up" data-i="' + i + '" data-k="up" inputmode="decimal" aria-label="第 ' + (i + 1) + ' 段上升"></td>' +
+        '<td data-l="下降 米"><input id="seg' + i + 'down" data-i="' + i + '" data-k="down" inputmode="decimal" aria-label="第 ' + (i + 1) + ' 段下降"></td>' +
+        '<td><button class="x" data-del="' + i + '" title="删掉这段"' + (state.segs.length <= 1 ? ' disabled' : '') + '>×</button></td></tr>';
+    });
+    $('segs').innerHTML = h + '</tbody>';
+    state.segs.forEach((g, i) => ['name', 'km', 'up', 'down'].forEach((k) => { $('seg' + i + k).value = g[k]; }));
+    $('addSeg').disabled = state.segs.length >= C.MAXSEG;
+    drawCalib();
+  }
+  function drawCalib() {
+    const sel = $('calibCp');
+    sel.innerHTML = '<option value="0">还没出发 / 不校准</option>' + state.segs.map((g, i) => '<option value="' + (i + 1) + '">' + esc((i + 1) + '. ' + (g.name || '第 ' + (i + 1) + ' 个路标')) + '</option>').join('');
+    if (Number(state.calibCp) > state.segs.length) state.calibCp = '0';
+    sel.value = state.calibCp;
+    $('calibAt').disabled = state.calibCp === '0';
+  }
+  function fill() { F.forEach((k) => { $(k).value = state[k]; }); drawSegs(); }
+
+  /* 路线剖面 SVG */
+  function profile(r) {
+    const W = 900, H = 300, L = 60, R = 20, T = 34, B = 40;
+    const P = r.P, n = P.segs.length;
+    const xs = r.K, hs = [0];
+    P.segs.forEach((g, i) => hs.push(hs[i] + g.up - g.down));
+    const totalKm = xs[n], hMin = Math.min(0, ...hs), hMax = Math.max(1, ...hs);
+    const X = (k) => L + (k / totalKm) * (W - L - R), Y = (h) => H - B - ((h - hMin) / (hMax - hMin)) * (H - T - B);
+    let s = '<line x1="' + L + '" y1="' + (H - B) + '" x2="' + (W - R) + '" y2="' + (H - B) + '" stroke="#cfd8d2"/>';
+    s += '<text x="' + L + '" y="' + (H - 12) + '" font-size="12" fill="#77837b">起点 0 km</text>';
+    s += '<text x="' + (W - R) + '" y="' + (H - 12) + '" font-size="12" fill="#77837b" text-anchor="end">' + esc(C.fmt(totalKm, 1)) + ' km</text>';
+    s += '<text x="' + (L - 6) + '" y="' + (Y(hMax) + 4) + '" font-size="11" fill="#77837b" text-anchor="end">' + esc(C.fmt(hMax, 0)) + ' 米</text>';
+    s += '<text x="' + (L - 6) + '" y="' + (Y(0) + 4) + '" font-size="11" fill="#77837b" text-anchor="end">0</text>';
+    const tk = r.turn ? r.turn.km : Infinity;
+    for (let i = 0; i < n; i++) {
+      const a = xs[i], b = xs[i + 1], ha = hs[i], hb = hs[i + 1];
+      const seg = (k0, k1, col) => {
+        const h0 = ha + (hb - ha) * (k0 - a) / (b - a), h1 = ha + (hb - ha) * (k1 - a) / (b - a);
+        return '<line x1="' + X(k0).toFixed(1) + '" y1="' + Y(h0).toFixed(1) + '" x2="' + X(k1).toFixed(1) + '" y2="' + Y(h1).toFixed(1) + '" stroke="' + col + '" stroke-width="5" stroke-linecap="round"/>';
+      };
+      if (b <= tk) s += seg(a, b, '#3f8a5f');
+      else if (a >= tk) s += seg(a, b, '#c0503f');
+      else s += seg(a, tk, '#3f8a5f') + seg(tk, b, '#c0503f');
+    }
+    if (r.turn) {
+      const x = X(r.turn.km);
+      s += '<line x1="' + x.toFixed(1) + '" y1="' + T + '" x2="' + x.toFixed(1) + '" y2="' + (H - B) + '" stroke="#1f2622" stroke-width="2" stroke-dasharray="5 4"/>';
+      s += '<text x="' + x.toFixed(1) + '" y="' + (T - 10) + '" font-size="13" font-weight="700" fill="#1f2622" text-anchor="' + (x > W - 140 ? 'end' : x < L + 100 ? 'start' : 'middle') + '">' + esc(C.clock(r.turn.at) + ' 掉头 · ' + C.fmt(r.turn.km, 1) + ' km') + '</text>';
+    }
+    /* 路标：名字和关门时间；标签放不下就只写序号 */
+    const minGap = 80;
+    let lastX = -Infinity;
+    r.cps.forEach((c, j) => {
+      const x = X(xs[j + 1]), y = Y(hs[j + 1]);
+      s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="5" fill="#fff" stroke="' + (c.ok ? '#2f5d47' : '#b23a2b') + '" stroke-width="2"/>';
+      const room = x - lastX >= minGap;
+      const anchor = x > W - 90 ? 'end' : x < L + 60 ? 'start' : 'middle';
+      const nm = c.name.length > 8 ? c.name.slice(0, 7) + '…' : c.name;
+      s += '<text x="' + x.toFixed(1) + '" y="' + (y - 22).toFixed(1) + '" font-size="12" fill="#1f2622" stroke="#fff" stroke-width="3" paint-order="stroke" text-anchor="' + anchor + '">' + esc(room ? nm : String(j + 1)) + '</text>';
+      if (room) s += '<text x="' + x.toFixed(1) + '" y="' + (y - 9).toFixed(1) + '" font-size="11" stroke="#fff" stroke-width="3" paint-order="stroke" fill="' + (c.ok ? '#2f5d47' : '#b23a2b') + '" text-anchor="' + anchor + '">关门 ' + esc(C.cutText(c, P)) + '</text>';
+      if (room) lastX = x;
+    });
+    return s;
+  }
+
+  function render(r, sg) {
+    const k = r.k, P = r.P;
+    $('summary').textContent = r.summary;
+    $('summary').className = r.feasible ? 'yes' : 'no';
+    if (r.now && r.now.late) {
+      $('nums').innerHTML = '<div><small>现在掉头，回到起点</small><b class="neg">' + esc(C.clock(r.now.returnAt)) + '</b></div><div><small>回去要走</small><b>' + esc(C.dur(Math.round(r.now.backMin))) + '</b></div>' +
+        '<div><small>最晚回到起点</small><b>' + esc(C.clock(P.deadline)) + '</b></div><div><small>' + (r.now.slack >= 0 ? '富余' : '会晚') + '</small><b class="' + (r.now.slack >= 0 ? 'pos' : 'neg') + '">' + esc(C.dur(r.now.slack)) + '</b></div>';
+    } else $('nums').innerHTML = (r.feasible
+      ? '<div><small>预计到终点</small><b>' + esc(C.clock(k.summitAt)) + '</b></div><div><small>最晚往回走</small><b>' + esc(C.clock(k.leaveBy)) + '</b></div>'
+      : '<div><small>最晚掉头</small><b class="neg">' + esc(C.clock(r.turn.at)) + '</b></div><div><small>掉头时离起点</small><b>' + esc(C.fmt(r.turn.km, 1)) + ' km</b></div>') +
+      '<div><small>最晚回到起点</small><b>' + esc(C.clock(P.deadline)) + '</b></div>' +
+      '<div><small>' + (r.feasible ? '富余' : '走完全程会晚') + '</small><b class="' + (r.feasible ? 'pos' : 'neg') + '">' + esc(C.dur(k.slack)) + '</b></div>';
+    $('facts').innerHTML = r.facts.map((f) => '<li>' + esc(f) + '</li>').join('');
+    $('profile').innerHTML = profile(r);
+    $('gates').innerHTML = r.cps.map((c) => '<div class="gate' + (c.ok ? '' : ' late') + '"><div class="gn"></div><div class="gk">离起点 ' + esc(C.fmt(c.km, 1)) + ' km</div>' +
+      '<div class="gt">关门 <b>' + esc(C.cutText(c, P)) + '</b></div><div class="gt">预计到 ' + esc(C.clock(c.arrive)) + '</div>' +
+      '<div class="gs ' + (c.ok ? 'pos' : 'neg') + '">' + (c.ok ? '富余 ' + esc(C.dur(c.slack)) : '晚 ' + esc(C.dur(-c.slack)) + '，到这里之前就要掉头') + '</div></div>').join('');
+    [].forEach.call($('gates').querySelectorAll('.gn'), (el, i) => { el.textContent = r.cps[i].i + '. ' + r.cps[i].name; });
+    const ul = $('sugs'); ul.innerHTML = '';
+    $('sugCard').style.display = sg.length ? '' : 'none';
+    sg.forEach((s) => {
+      const li = document.createElement('li');
+      li.innerHTML = '<span></span><button class="ghost" data-kind="' + esc(s.kind) + '">照这个改</button>';
+      li.querySelector('span').textContent = s.text;
+      li.querySelector('button').addEventListener('click', () => { Object.assign(state, copy(s.apply)); fill(); run(); });
+      ul.appendChild(li);
+    });
+  }
+
+  function run() {
+    [].forEach.call(document.querySelectorAll('.bad'), (e) => e.classList.remove('bad'));
+    try {
+      const r = C.calculate(state);
+      const sg = C.suggestions(state, r);
+      $('error').style.display = 'none'; $('out').style.display = '';
+      render(r, sg);
+      last = { r, sg };
+    } catch (e) {
+      last = null;
+      if (e.field) { const el = $(e.field); if (el) el.classList.add('bad'); }
+      $('error').textContent = '算不了：' + e.message; $('error').style.display = 'block';
+      $('out').style.display = 'none';
+    }
+    save();
+  }
+
+  /* ── 导出 ── */
+  function stamp() { const d = new Date(), z = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+  function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+  function wrap(g, t, w) {
+    const NOHEAD = '，。、；：！？）」』%';
+    const out = []; let line = '';
+    const toks = String(t).match(/[+-]?[0-9][0-9,.:%]*|[A-Za-z]+|[\s\S]/g) || [];
+    for (const ch of toks) {
+      if (g.measureText(line + ch).width > w && line) {
+        if (NOHEAD.indexOf(ch[0]) >= 0 || '（「『'.indexOf(line.slice(-1)) >= 0) { const l = line.slice(-1); out.push(line.slice(0, -1)); line = l + ch; }
+        else { out.push(line); line = ch.replace(/^\s+/, ''); }
+      } else line += ch;
+    }
+    if (line) out.push(line); return out;
+  }
+  function fitText(g, t, w, size, min, bold, FF) {
+    let fs = size; g.font = (bold ? 'bold ' : '') + fs + 'px ' + FF;
+    while (fs > min && g.measureText(t).width > w) { fs -= 1; g.font = (bold ? 'bold ' : '') + fs + 'px ' + FF; }
+    if (g.measureText(t).width <= w) return t;
+    let s = t; while (s.length > 1 && g.measureText(s + '…').width > w) s = s.slice(0, -1);
+    return s + '…';
+  }
+  function drawPNG(Lx) {
+    const r = Lx.r, k = r.k, P = r.P;
+    const W = 1080, H = 1350, X = 90, TW = 900;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d'); const FF = '"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillStyle = '#eef1ee'; g.fillRect(0, 0, W, H); g.fillStyle = '#fff'; g.fillRect(50, 50, 980, 1250);
+    g.fillStyle = '#66736b'; g.font = '30px ' + FF; g.fillText('天黑比你先到', X, 114);
+    const sub = '出发 ' + C.clock(P.start) + ' · 日落 ' + C.clock(P.sunset) + ' · 最晚回到起点 ' + C.clock(P.deadline) + ' · 往返 ' + C.fmt(k.km, 1) + ' km';
+    g.fillText(fitText(g, sub, TW, 21, 14, false, FF), X, 150);
+    const big = r.now && r.now.late
+      ? [['现在掉头，回到起点', C.clock(r.now.returnAt), -1], ['回去要走', C.dur(Math.round(r.now.backMin)), 0], [r.now.slack >= 0 ? '富余' : '会晚', C.dur(r.now.slack), r.now.slack >= 0 ? 1 : -1]]
+      : r.feasible
+      ? [['预计到终点', C.clock(k.summitAt), 0], ['最晚往回走', C.clock(k.leaveBy), 0], ['富余', C.dur(k.slack), 1]]
+      : [['最晚掉头', C.clock(r.turn.at), -1], ['掉头时离起点', C.fmt(r.turn.km, 1) + ' km', 0], ['走完全程会晚', C.dur(k.slack), -1]];
+    big.forEach((b, i) => {
+      const cx = X + i * 300;
+      g.fillStyle = '#77837b'; g.font = '20px ' + FF; g.fillText(b[0], cx, 206);
+      g.fillStyle = b[2] < 0 ? '#b23a2b' : b[2] > 0 ? '#2f6b3a' : '#1f2622';
+      g.fillText(fitText(g, b[1], 270, 54, 22, true, FF), cx, 268);
+    });
+    let fs = 30, sl;
+    for (; fs >= 22; fs -= 2) { g.font = 'bold ' + fs + 'px ' + FF; sl = wrap(g, r.summary, TW); if (sl.length <= 3) break; }
+    g.fillStyle = r.feasible ? '#2f5d47' : '#9a3324';
+    let y = 334;
+    sl.slice(0, 3).forEach((l, i, a) => { g.fillText(i === 2 && sl.length > 3 ? l.slice(0, -1) + '…' : l, X, y); y += Math.round(fs * 1.35); });
+    y += 10;
+    /* 剖面 */
+    const n = P.segs.length, xs = r.K, hs = [0];
+    P.segs.forEach((s, i) => hs.push(hs[i] + s.up - s.down));
+    const top = y + 40, bot = y + 250, hMin = Math.min(0, ...hs), hMax = Math.max(1, ...hs);
+    const PX = (km) => X + km / xs[n] * TW, PY = (h) => bot - (h - hMin) / (hMax - hMin) * (bot - top);
+    g.strokeStyle = '#cfd8d2'; g.lineWidth = 2; g.beginPath(); g.moveTo(X, bot); g.lineTo(X + TW, bot); g.stroke();
+    const tk = r.turn ? r.turn.km : Infinity;
+    g.lineWidth = 8; g.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const a = xs[i], b = xs[i + 1], ha = hs[i], hb = hs[i + 1];
+      const line = (k0, k1, col) => { const h0 = ha + (hb - ha) * (k0 - a) / (b - a), h1 = ha + (hb - ha) * (k1 - a) / (b - a); g.strokeStyle = col; g.beginPath(); g.moveTo(PX(k0), PY(h0)); g.lineTo(PX(k1), PY(h1)); g.stroke(); };
+      if (b <= tk) line(a, b, '#3f8a5f'); else if (a >= tk) line(a, b, '#c0503f'); else { line(a, tk, '#3f8a5f'); line(tk, b, '#c0503f'); }
+    }
+    if (r.turn) {
+      const x = PX(r.turn.km);
+      g.strokeStyle = '#1f2622'; g.lineWidth = 2; g.setLineDash([8, 6]); g.beginPath(); g.moveTo(x, top - 30); g.lineTo(x, bot); g.stroke(); g.setLineDash([]);
+    }
+    let lastX = -Infinity;
+    r.cps.forEach((c, j) => {
+      const x = PX(xs[j + 1]), yy = PY(hs[j + 1]);
+      g.fillStyle = '#fff'; g.strokeStyle = c.ok ? '#2f5d47' : '#b23a2b'; g.lineWidth = 3; g.beginPath(); g.arc(x, yy, 7, 0, 7); g.fill(); g.stroke();
+    });
+    /* 圆点全画完再写标签，后面的点不会盖住前面的字 */
+    r.cps.forEach((c, j) => {
+      const x = PX(xs[j + 1]), yy = PY(hs[j + 1]);
+      if (x - lastX < 120) return;
+      lastX = x;
+      g.textAlign = x > X + TW - 100 ? 'right' : x < X + 70 ? 'left' : 'center';
+      const nm = fitText(g, c.name, 150, 18, 14, false, FF), nf = g.font, ct = '关门 ' + C.cutText(c, P);
+      g.font = '16px ' + FF; const bw = Math.max(g.measureText(ct).width, (g.font = nf, g.measureText(nm).width)) + 8;
+      const bx = g.textAlign === 'right' ? x - bw + 4 : g.textAlign === 'left' ? x - 4 : x - bw / 2;
+      g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(bx, yy - 54, bw, 46);
+      g.fillStyle = '#1f2622'; g.font = nf; g.fillText(nm, x, yy - 34);
+      g.fillStyle = c.ok ? '#2f5d47' : '#b23a2b'; g.font = '16px ' + FF; g.fillText(ct, x, yy - 14);
+      g.textAlign = 'left';
+    });
+    g.fillStyle = '#77837b'; g.font = '15px ' + FF; g.fillText('起点', X, bot + 22); g.textAlign = 'right'; g.fillText(C.fmt(xs[n], 1) + ' km', X + TW, bot + 22); g.textAlign = 'left';
+    y = bot + 56;
+    /* 关门时间表 */
+    const cols = [X, X + 470, X + 640, X + TW];
+    g.font = '18px ' + FF; g.fillStyle = '#77837b';
+    ['路标', '预计到达', '关门', '富余'].forEach((h, i) => { g.textAlign = i ? 'right' : 'left'; g.fillText(h, cols[i] + (i === 1 || i === 2 ? 60 : 0), y); });
+    y += 10;
+    const rowH = 36, maxRows = Math.max(0, Math.floor((1050 - y) / rowH));
+    let rows = r.cps.slice();
+    if (rows.length > maxRows) rows = rows.slice(0, maxRows - 1).concat([rows[rows.length - 1]]);
+    rows.forEach((c) => {
+      g.fillStyle = c.ok ? '#1f2622' : '#b23a2b'; g.font = '20px ' + FF; g.textAlign = 'left';
+      g.fillText(fitText(g, c.i + '. ' + c.name, 380, 20, 20, false, FF), cols[0], y + 28);
+      g.font = '20px ' + FF;
+      [[C.clock(c.arrive), 1, 220], [C.cutText(c, P), 2, 150], [c.ok ? C.dur(c.slack) : '晚 ' + C.dur(-c.slack), 3, 190]].forEach((t) => { g.textAlign = 'right'; g.fillText(fitText(g, t[0], t[2], 20, 14, false, FF), cols[t[1]] + (t[1] < 3 ? 60 : 0), y + 28); g.font = '20px ' + FF; });
+      y += rowH;
+    });
+    g.textAlign = 'left';
+    y += 50;
+    g.fillStyle = '#1f2622'; g.font = '20px ' + FF;
+    const items = r.facts.slice(0, 2).map((t) => '· ' + t).concat(Lx.sg.slice(0, 2).map((s) => '→ ' + s.text));
+    for (const t of items) {
+      const ls = wrap(g, t, TW);
+      if (y + ls.length * 30 > 1232) break;
+      ls.forEach((l) => { g.fillText(l, X, y); y += 30; });
+      y += 6;
+    }
+    g.fillStyle = '#77837b'; g.font = '17px ' + FF;
+    g.fillText('按距离 + 爬升 + 你填的速度估算，不含天气、迷路、受伤；山谷里天黑得比日落早。', X, 1262);
+    return cv;
+  }
+  function backup() {
+    const r = last.r;
+    return { app: '天黑比你先到', version: 1, savedAt: stamp(), input: copy(state),
+      result: { summary: r.summary, feasible: r.feasible, factor: r.factor, deadline: C.clock(r.P.deadline), summitAt: C.clock(r.k.summitAt), returnAt: C.clock(r.k.returnAt),
+        latestStart: C.clock(r.k.latestStart), slackMin: r.k.slack, turn: r.turn ? { at: C.clock(r.turn.at), km: r.turn.km, between: [r.turn.from, r.turn.to] } : null,
+        checkpoints: r.cps.map((c) => ({ name: c.name, km: c.km, arrive: C.clock(c.arrive), cutoff: C.cutText(c, r.P), slackMin: c.slack, ok: c.ok })), facts: r.facts } };
+  }
+
+  function init() {
+    F.forEach((k) => $(k).addEventListener('input', () => { state[k] = $(k).value; run(); }));
+    $('calibCp').addEventListener('change', () => { state.calibCp = $('calibCp').value; $('calibAt').disabled = state.calibCp === '0'; run(); });
+    $('segs').addEventListener('input', (e) => {
+      const t = e.target; if (!t.dataset || t.dataset.i == null) return;
+      state.segs[Number(t.dataset.i)][t.dataset.k] = t.value;
+      if (t.dataset.k === 'name') drawCalib();
+      run();
+    });
+    $('segs').addEventListener('click', (e) => {
+      const t = e.target.closest && e.target.closest('button[data-del]'); if (!t || state.segs.length <= 1) return;
+      const i = Number(t.dataset.del); state.segs.splice(i, 1);
+      const ck = Number(state.calibCp); if (ck > i) state.calibCp = ck === i + 1 ? '0' : String(ck - 1);
+      drawSegs(); run();
+    });
+    $('addSeg').addEventListener('click', () => { if (state.segs.length >= C.MAXSEG) return; state.segs.push({ name: '', km: '1', up: '100', down: '0' }); drawSegs(); run(); });
+    const box = $('presets');
+    PRESETS.forEach((p) => {
+      const b = document.createElement('button'); b.className = 'ghost'; b.textContent = p[0];
+      b.addEventListener('click', () => { state = copy(p[1]); fill(); run(); });
+      box.appendChild(b);
+    });
+    $('reset').addEventListener('click', () => { state = copy(DEFAULT); fill(); run(); });
+    $('dlCSV').addEventListener('click', () => { if (last) download('天黑比你先到.csv', new Blob(['\ufeff' + C.toCSV(last.r, stamp())], { type: 'text/csv;charset=utf-8' })); });
+    $('dlMD').addEventListener('click', () => { if (last) download('天黑比你先到.md', new Blob([C.toMD(last.r, stamp(), last.sg)], { type: 'text/markdown;charset=utf-8' })); });
+    $('dlJSON').addEventListener('click', () => { if (last) download('天黑比你先到-备份.json', new Blob([JSON.stringify(backup(), null, 2)], { type: 'application/json' })); });
+    $('dlPNG').addEventListener('click', () => { if (last) drawPNG(last).toBlob((b) => download('天黑比你先到-1080x1350.png', b), 'image/png'); });
+    state = load() || copy(DEFAULT);
+    fill(); run();
+    window.__ex = { last: () => last, state: () => state, presets: PRESETS };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+  </script>
+</body>
+</html>
